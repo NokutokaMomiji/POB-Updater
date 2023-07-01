@@ -9,17 +9,20 @@ namespace POBUpdater
 {
     class Program
     {
+        // Declaring the strings and variables used for the program.
         static string appdataLocation = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        static string appdataFolder = appdataLocation + "/Project_One_Bullet";
+        static string appdataFolder = appdataLocation + "/Project_One_Bullet";  // This is also the actual One Bullet game appdata location...
         static string hashFile = appdataFolder + "/ch";
-        const string gameURL = "https://liatestingground.000webhostapp.com/data/";
+        const string gameURL = "https://liatestingground.000webhostapp.com/data/"; // Lmao.
         static string gameHash = gameURL + "info.txt";
         static string gameFile = gameURL + "latest.zip";
         static string storedHash = "";
-        static bool shouldWait = false;
+        static bool shouldWait = false; // This is a very dumb hack.
         
-        static WebClient client = new WebClient();
+        // Originally planned to use this to download EVERYTHING. Probably could but like...
+        static WebClient client = new WebClient(); 
 
+        // This is a very convoluted and dumb way to do things, but like... screw it.
         static bool ShouldDownload() {
             try
             {
@@ -67,6 +70,8 @@ namespace POBUpdater
         static void DownloadGame() {
             Console.WriteLine("> Downloading update...");
             //client.Headers.Add("Accept: text/html, application/xhtml+xml, */*");
+
+            // We add the damn header thingy that I don't understand to avoid a 407, we set event handlers and we download the file.
             using (var wc = new WebClient()) {
                 wc.Headers.Add("User-Agent: Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)");
                 wc.DownloadProgressChanged += new DownloadProgressChangedEventHandler(DownloadProgress);
@@ -78,12 +83,10 @@ namespace POBUpdater
 
         static void DownloadProgress(object sender, DownloadProgressChangedEventArgs e) {
             if (e.ProgressPercentage == 100)
-            {
-                Console.WriteLine("> Downloaded {0} bytes / {1} bytes.", e.BytesReceived, e.TotalBytesToReceive);
-            }
+                Console.WriteLine("> Downloaded {0} Mb / {1} Mb.", (e.BytesReceived / 1024 / 1024), (e.TotalBytesToReceive / 1024 / 1024));
             else
             {
-                Console.WriteLine("> Downloading {0} bytes / {1} bytes. {2}%", e.BytesReceived, e.TotalBytesToReceive, e.ProgressPercentage);
+                Console.WriteLine("> Downloading {0} Mb / {1} Mb. {2}%", (e.BytesReceived / 1024 / 1024), (e.TotalBytesToReceive / 1024 / 1024), e.ProgressPercentage);
             }
         }
 
@@ -103,22 +106,35 @@ namespace POBUpdater
             Console.WriteLine("> Completed download!");
             if (Directory.Exists("bin"))
                 Directory.Delete("bin", true);
+            Console.WriteLine("> Extracting...");
             ZipFile.ExtractToDirectory("latest.zip", "bin");
+            Console.WriteLine("> Extracted!");
             File.WriteAllText(hashFile, storedHash);
             if (File.Exists("latest.zip"))
                 File.Delete("latest.zip");
+            Console.WriteLine("Cleaned up!");
             shouldWait = false;
+            Console.WriteLine(shouldWait);
         }
 
         static void RunGame() {
             Console.WriteLine("\n> Opening game.");
+            // Have got to make sure that the game exists or else we are all screwed.
             if (!Directory.Exists("bin")) {
                 Console.WriteLine("> [ERROR]: GAME DATA MISSING! PLEASE REINSTALL GAME.");
                 Console.WriteLine("> [Press Enter to exit...]");
                 Console.ReadLine();
                 return;
             }
-            System.Diagnostics.Process.Start("bin/Project One Bullet.exe");
+
+            // Now to actually make sure that the game exists.
+            if (File.Exists("bin/Project One Bullet.exe"))
+                System.Diagnostics.Process.Start("bin/Project One Bullet.exe");
+            else {
+                // Yeah, antiviruses can do all sorts of shitty things.
+                Console.WriteLine("> [ERROR]: GAME EXECUTABLE IS MISSING! MAKE SURE THAT YOUR ANTIVIRUS DIDN'T QUARANTINE IT OR SOMETHING.");
+                Console.ReadLine();
+            }
         }
 
         static void Main(string[] args)
@@ -126,10 +142,11 @@ namespace POBUpdater
             Console.WriteLine("\n|----------------[Project: One Bullet]----------------|\n");
             Console.WriteLine("> Welcome to the Project: One Bullet Development Build.");
             
+            // Technically I could use like... any other place than the actual game appdata folder, but I guess it is a safe place.
             CreateAppdataFolder();
-            //Console.WriteLine("> Setup Completed!");
 
             try {
+                // We check the hashes to see if the file has changed.
                 if (!EqualHashes()) {
                     Console.WriteLine("> |------[UPDATE DETECTED!]------|");
                     Console.WriteLine("> An update for the game was detected. Do you wish to install the update?\n");
@@ -140,7 +157,12 @@ namespace POBUpdater
                     if (ShouldDownload())
                         DownloadGame();
                     
-                    while (shouldWait) {}
+                    // Since the download thingy is asynchronous, I make a loop to pause execution of the program until the file finishes downloading.
+                    while (shouldWait) { Console.Write(""); /* This is to stop the loop from becoming an actual infinite loop. */ }
+                }
+                else if (!Directory.Exists("bin")) {
+                    DownloadGame();
+                    while (shouldWait) { Console.Write(""); /* The program hangs without this line of code.*/ }
                 }
             }
             catch (Exception e) {
